@@ -5,8 +5,62 @@ let isPlaying = false;
 let audio = document.getElementById('playerAudio');
 let repeatMode = 'none'; // 'none', 'one', 'all'
 
+
 // Base de API/backend para recursos (configurável via window.API_BASE_URL ou localStorage)
 const API_BASE_URL = (typeof window !== 'undefined' && (window.API_BASE_URL || localStorage.getItem('API_BASE_URL'))) || 'http://localhost:5000';
+
+// Verifica comunicação com o backend ao iniciar
+async function checkBackendConnection() {
+    try {
+        const resp = await fetch(`${API_BASE_URL}/list_playlists`, { method: 'GET', mode: 'cors' });
+        if (!resp.ok) throw new Error('Resposta inesperada do backend');
+        // Se chegou aqui, está ok
+        return true;
+    } catch (e) {
+        showBackendErrorAlert();
+        return false;
+    }
+}
+
+function showBackendErrorAlert() {
+    // Cria um alerta visível na tela
+    if (document.getElementById('backendErrorAlert')) return;
+    const div = document.createElement('div');
+    div.id = 'backendErrorAlert';
+    div.style.position = 'fixed';
+    div.style.top = '0';
+    div.style.left = '0';
+    div.style.width = '100vw';
+    div.style.background = '#ff4444';
+    div.style.color = '#fff';
+    div.style.zIndex = '99999';
+    div.style.padding = '18px 10px';
+    div.style.textAlign = 'center';
+    div.style.fontSize = '1.1em';
+    div.style.fontWeight = 'bold';
+    div.innerHTML = `
+        <span>❌ Falha ao comunicar com o servidor backend.<br>
+        Verifique se o backend está rodando e se o endereço da API está correto.<br>
+        <b>API_BASE_URL:</b> <code>${API_BASE_URL}</code><br>
+        <button id="fixApiUrlBtn" style="margin-top:8px;padding:6px 16px;border:none;border-radius:6px;background:#fff;color:#ff4444;font-weight:bold;cursor:pointer;">Corrigir endereço</button>
+        </span>
+    `;
+    document.body.appendChild(div);
+    document.getElementById('fixApiUrlBtn').onclick = function() {
+        const url = prompt('Digite o endereço correto do backend (ex: http://localhost:5000):', API_BASE_URL);
+        if (url) {
+            localStorage.setItem('API_BASE_URL', url);
+            window.location.reload();
+        }
+    };
+}
+
+// Executa a verificação ao carregar a página
+if (typeof window !== 'undefined') {
+    window.addEventListener('DOMContentLoaded', () => {
+        checkBackendConnection();
+    });
+}
 
 function resolveCoverUrl(coverPath) {
     const path = coverPath || 'musics/default-cover.jpg';
