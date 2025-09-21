@@ -6,24 +6,46 @@ let audio = document.getElementById('playerAudio');
 let repeatMode = 'none'; // 'none', 'one', 'all'
 
 
-// Base de API/backend para recursos (configurável via window.API_BASE_URL ou localStorage)
-const API_BASE_URL = (typeof window !== 'undefined' && (window.API_BASE_URL || localStorage.getItem('API_BASE_URL'))) || 'http://localhost:5000';
+
+// Função para obter sempre o valor atualizado do endereço do backend
+function getApiBaseUrl() {
+    if (typeof window !== 'undefined') {
+        return (window.API_BASE_URL || localStorage.getItem('API_BASE_URL')) || 'http://localhost:5000';
+    }
+    return 'http://localhost:5000';
+}
+
+// Para compatibilidade com código antigo
+const API_BASE_URL = getApiBaseUrl();
 
 // Verifica comunicação com o backend ao iniciar
+
 async function checkBackendConnection() {
+    const url = `${getApiBaseUrl()}/list_playlists`;
     try {
-        const resp = await fetch(`${API_BASE_URL}/list_playlists`, { method: 'GET', mode: 'cors' });
-        if (!resp.ok) throw new Error('Resposta inesperada do backend');
+        const resp = await fetch(url, { method: 'GET', mode: 'cors' });
+        if (!resp.ok) throw new Error(`Resposta inesperada do backend: ${resp.status} ${resp.statusText}`);
         // Se chegou aqui, está ok
         return true;
     } catch (e) {
-        showBackendErrorAlert();
+        showBackendErrorAlert(url, e);
         return false;
     }
 }
 
-function showBackendErrorAlert() {
-    // Cria um alerta visível na tela
+
+function formatErrorMessage(errorObj) {
+    if (!errorObj) return '';
+    if (typeof errorObj === 'string') return errorObj;
+    if (errorObj instanceof Error) return errorObj.message;
+    try {
+        return JSON.stringify(errorObj, Object.getOwnPropertyNames(errorObj));
+    } catch (e) {
+        return String(errorObj);
+    }
+}
+
+function showBackendErrorAlert(failedUrl, errorObj) {
     if (document.getElementById('backendErrorAlert')) return;
     const div = document.createElement('div');
     div.id = 'backendErrorAlert';
@@ -40,19 +62,27 @@ function showBackendErrorAlert() {
     div.style.fontWeight = 'bold';
     div.innerHTML = `
         <span>❌ Falha ao comunicar com o servidor backend.<br>
+        <b>URL chamada:</b> <code>${failedUrl}</code><br>
+        <b>API_BASE_URL:</b> <code>${getApiBaseUrl()}</code><br>
+        <b>Erro:</b> <code>${formatErrorMessage(errorObj)}</code><br>
         Verifique se o backend está rodando e se o endereço da API está correto.<br>
-        <b>API_BASE_URL:</b> <code>${API_BASE_URL}</code><br>
         <button id="fixApiUrlBtn" style="margin-top:8px;padding:6px 16px;border:none;border-radius:6px;background:#fff;color:#ff4444;font-weight:bold;cursor:pointer;">Corrigir endereço</button>
         </span>
     `;
     document.body.appendChild(div);
     document.getElementById('fixApiUrlBtn').onclick = function() {
-        const url = prompt('Digite o endereço correto do backend (ex: http://localhost:5000):', API_BASE_URL);
+        const url = prompt('Digite o endereço correto do backend (ex: http://localhost:5000):', getApiBaseUrl());
         if (url) {
             localStorage.setItem('API_BASE_URL', url);
-            window.location.reload();
+            // Atualiza window.API_BASE_URL também
+            window.API_BASE_URL = url;
+            // Remove alerta e tenta novamente
+            div.remove();
+            checkBackendConnection();
         }
     };
+    // Também loga no console para debug
+    console.error('Falha ao comunicar com o backend:', failedUrl, errorObj);
 }
 
 // Executa a verificação ao carregar a página
